@@ -3,13 +3,23 @@ package practice.twitch1.main;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -37,8 +47,34 @@ public class Logic {
     @PostConstruct
     void logic2() {
         log.info("--- START ---");
-        
+        List<Followed> followedList = new ArrayList<>();
+        try (final var paths = Files.walk(Paths.get("C:\\C3\\dev\\datasets\\my_twitch\\followed1"))) {
+            final var files = paths.filter(Files::isRegularFile).toList();
+            for (var file : files) {
+                log.info(file.toString());
+                final var followedJsons = IOUtils.readLines(new FileInputStream(file.toString()), StandardCharsets.UTF_8);
+                var followed = objectMapper.readValue(followedJsons.getFirst(), Followed.class);
+                followedList.add(followed);
+            }
+        } catch (IOException ex) {
+            log.error(ex.getMessage());
+        }
+        followed(followedList);
         log.info("--- END ---");
+    }
+
+    private void followed(List<Followed> followedList) {
+        Map<String, Broadcaster> broadcasters = new HashMap<>();
+        for (var followed : followedList) {
+            for (var broadcaster : followed.data()) {
+                final var broadcasterId = broadcaster.broadcasterId();
+                if (broadcasters.containsKey(broadcasterId)) {
+                    throw new IllegalStateException("Duplicate broadcasterId: " + broadcasterId);
+                }
+                broadcasters.put(broadcasterId, broadcaster);
+            }
+        }
+        log.info("broadcasters.size(): {}", broadcasters.size());
     }
 
 //    private TwitchToken postForToken1() {
